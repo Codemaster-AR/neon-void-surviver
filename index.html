@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Void Survivor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600&display=swap');
+      
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: #020617;
+        font-family: 'Inter', sans-serif;
+        color: white;
+        user-select: none;
+      }
+
+      .font-orbitron { font-family: 'Orbitron', sans-serif; }
+      
+      canvas { display: block; }
+
+      .upgrade-card {
+        background: rgba(15, 23, 42, 0.9);
+        border: 2px solid rgba(51, 65, 85, 1);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+      }
+      .upgrade-card.affordable:hover {
+        border-color: #22d3ee;
+        transform: translateY(-5px);
+        box-shadow: 0 0 30px rgba(34, 211, 238, 0.2);
+      }
+      .upgrade-card.expensive {
+        opacity: 0.5;
+        cursor: not-allowed;
+        filter: grayscale(1);
+      }
+
+      .bar-shadow { filter: drop-shadow(0 0 8px currentColor); }
+
+      #ui-layer { pointer-events: none; }
+      #ui-layer button, #ui-layer .interactive { pointer-events: auto; }
+
+      .animate-glitch {
+        animation: glitch 1s linear infinite;
+      }
+      @keyframes glitch {
+        0% { transform: translate(0); }
+        20% { transform: translate(-2px, 2px); }
+        40% { transform: translate(-2px, -2px); }
+        60% { transform: translate(2px, 2px); }
+        80% { transform: translate(2px, -2px); }
+        100% { transform: translate(0); }
+      }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer" class="fixed inset-0 z-10">
+        <!-- Main Menu -->
+        <div id="menu-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md">
+            <h1 class="text-7xl md:text-8xl font-orbitron font-black text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 mb-2 drop-shadow-[0_0_30px_rgba(34,211,238,0.5)] text-center">
+                NEON VOID
+            </h1>
+            <p class="text-cyan-500 font-orbitron tracking-[0.5em] mb-12 text-sm uppercase opacity-80">Geometric Survivor</p>
+            
+            <div class="flex flex-col gap-4 w-full max-w-xs px-6">
+                <button id="start-btn" class="interactive py-4 bg-cyan-500 hover:bg-cyan-400 transition-all font-orbitron font-bold text-slate-950 rounded-md shadow-[0_0_20px_rgba(34,211,238,0.4)] transform hover:scale-105 active:scale-95">
+                    INITIATE
+                </button>
+                <div class="flex justify-between items-center text-xs font-orbitron text-slate-400 bg-slate-900/50 p-3 rounded border border-slate-800">
+                    <span>RECORD</span>
+                    <span id="high-score-val" class="text-cyan-400 font-bold">0</span>
+                </div>
+            </div>
+
+            <div class="mt-16 text-slate-500 text-xs font-orbitron flex flex-wrap justify-center gap-8 px-10">
+                <span class="flex items-center gap-2"><span class="px-2 py-1 bg-slate-800 rounded">WASD</span> MOVE</span>
+                <span class="flex items-center gap-2"><span class="px-2 py-1 bg-slate-800 rounded">MOUSE</span> AIM</span>
+                <span class="flex items-center gap-2 text-yellow-400 font-bold"><span class="px-2 py-1 bg-slate-800 rounded text-white">[E]</span> OPEN SHOP</span>
+            </div>
+        </div>
+
+        <!-- HUD -->
+        <div id="hud" class="hidden h-full flex flex-col justify-between p-6">
+            <div class="flex justify-between items-start">
+                <div class="flex flex-col">
+                    <span class="text-slate-500 text-[10px] font-orbitron uppercase tracking-widest">Combat Score</span>
+                    <span id="score-val" class="text-4xl font-orbitron font-black text-white leading-none">0</span>
+                    <div class="flex items-center gap-2 mt-2 bg-slate-900/40 px-3 py-1 rounded-full border border-slate-800 w-fit">
+                        <span class="text-yellow-400 text-xs font-bold">●</span>
+                        <span id="coin-val" class="text-yellow-400 font-orbitron font-bold text-sm">0</span>
+                    </div>
+                </div>
+                <div class="flex flex-col items-end gap-1">
+                    <span id="level-val" class="text-cyan-400 text-xs font-orbitron font-bold uppercase">Rank 01</span>
+                    <div class="w-48 h-1.5 bg-slate-900 rounded-full border border-slate-800 overflow-hidden">
+                        <div id="xp-bar-inner" class="h-full bg-yellow-400 bar-shadow text-yellow-400" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full flex flex-col items-center gap-2 pb-6">
+                <div class="w-full max-w-md h-2 bg-slate-900 rounded-full border border-slate-800 overflow-hidden">
+                    <div id="hp-bar-inner" class="h-full bg-cyan-500 bar-shadow text-cyan-500 transition-all duration-300" style="width: 100%"></div>
+                </div>
+                <span class="text-slate-500 text-[9px] font-orbitron uppercase tracking-widest">Integrity Matrix</span>
+            </div>
+        </div>
+
+        <!-- Upgrade Selection (Shop) -->
+        <div id="upgrade-screen" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-xl px-4">
+            <h2 class="text-4xl font-orbitron font-black text-white mb-2 animate-glitch">SYSTEM SHOP</h2>
+            <p class="text-slate-500 font-orbitron text-xs mb-8 tracking-widest uppercase text-center">Upgrade systems with collected coins</p>
+            
+            <div class="mb-6 bg-slate-900/80 px-6 py-2 rounded-full border border-cyan-500/30 flex items-center gap-3">
+                <span class="text-slate-400 text-[10px] font-orbitron uppercase tracking-tighter">Available Coins:</span>
+                <span id="shop-coin-val" class="text-yellow-400 font-orbitron font-black text-xl">0</span>
+            </div>
+
+            <div id="upgrade-container" class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl mb-8">
+                <!-- Injected via JS -->
+            </div>
+
+            <button id="close-shop-btn" class="interactive px-12 py-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500 text-slate-400 hover:text-white transition-all font-orbitron text-xs tracking-widest uppercase rounded">
+                Resume Mission
+            </button>
+        </div>
+
+        <!-- Game Over -->
+        <div id="gameover-screen" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-red-950/20 backdrop-blur-md">
+            <h2 class="text-6xl md:text-8xl font-orbitron font-black text-red-500 mb-2 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]">CRITICAL FAILURE</h2>
+            <p class="text-slate-400 font-orbitron mb-12 tracking-[0.3em]">PILOT DE-SYNCHRONIZED</p>
+            <div class="flex flex-col items-center gap-8">
+                <div class="text-center">
+                    <p class="text-slate-500 text-xs uppercase font-orbitron mb-1">Combat Performance</p>
+                    <p id="final-score-val" class="text-5xl font-orbitron font-bold text-white">0</p>
+                </div>
+                <button id="restart-btn" class="interactive px-12 py-4 bg-white text-slate-950 font-orbitron font-bold rounded-sm hover:bg-cyan-400 transition-colors shadow-xl">
+                    RE-INITIALIZE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>
